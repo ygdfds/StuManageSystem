@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <conio.h>
+#include <windows.h>
 
 #define HIGH 25//菜单高度
 #define WIDTH 103//菜单宽度
@@ -33,8 +34,8 @@ typedef struct ListNode
     int (*is_exist)(struct ListNode* head, const char* num);
     int (*search_number)(struct ListNode* head, char* buffer);
     int (*Length)(struct ListNode* head);
-    void (*SaveFile)(struct ListNode* head);
-    void (*ReadFile)(struct ListNode* head);
+    void (*savefile)(struct ListNode* head);
+    void (*readfile)(struct ListNode* head);
     int (*get_number)(struct ListNode p);
 }*LinkList;
 
@@ -44,7 +45,7 @@ struct User//记录每个操作的坐标
     int y;
 };
 
-typedef enum { NUM, NAME, CLASS, PHONE, ADDR, MODIFY, DELETE, ADD, SORT, LTURN, RTURN, USER, SEARCH, QUIT }MenuData;//操作名称
+typedef enum { NUM, NAME, CLASS, PHONE, ADDR, MODIFY, DEL, ADD, SORT, LTURN, RTURN, USER, SEARCH, QUIT }MenuData;//操作名称
 
 struct Menu
 {
@@ -60,7 +61,7 @@ struct Menu
     void (*Lturn)(struct Menu* fu, struct ListNode head);
     void (*Rturn)(struct Menu* fu, struct ListNode head);
     void (*MenuSearch)(struct Menu* fu, struct ListNode head);
-    int (*Quit)(struct Menu* fu);
+    int (*Quit)(struct Menu* fu, struct ListNode* head);
 };
 
 //链表相关操作
@@ -75,8 +76,8 @@ int Length(LinkList head);
 int get_number(struct ListNode p);
 
 //文件相关操作
-void SaveFile(LinkList head);
-void ReadFile(LinkList head);
+void savefile(LinkList head);
+void readfile(LinkList head);
 
 //菜单对象相关操作
 int Start();
@@ -98,16 +99,36 @@ void Modify(struct Menu* fu, LinkList head, int number);
 void Lturn(struct Menu* fu, struct ListNode head);
 void Rturn(struct Menu* fu, struct ListNode head);
 void MenuSearch(struct Menu* fu, struct ListNode head);
-int Quit(struct Menu* fu);
+int Quit(struct Menu* fu,struct ListNode* head);
+
+//稳定清屏
+void gotoxy(int x, int y);//控制光标位置达到清屏目的
+void HideCursor();//隐藏光标，使清屏的闪烁不明显
 
 int main()
 {
+    HideCursor();
+    system("color 0E");
     struct Menu fu;
     struct ListNode head;
     InitList(&head);
     InitMenu(&fu);
     fu.Operate(&fu, &head);
+    system("cls");
     return 0;
+}
+
+void gotoxy(int x, int y)
+{
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);//获取标准输出句柄
+    COORD pos = { x,y };//设置控制台中的位置
+    SetConsoleCursorPosition(handle, pos);//控制光标将其移至对应位置
+}
+
+void HideCursor()
+{
+    CONSOLE_CURSOR_INFO cursor_info = { 1,0 };//设置光标类型，0表示隐藏光标
+    SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &cursor_info);//设置控制台中光标类型
 }
 
 void Swap(struct ListNode* p, struct ListNode* q)//交换两结点的信息
@@ -146,10 +167,10 @@ void InitList(LinkList head)//初始化链表
     head->search_number = search_number;
     head->Length = Length;
     head->Search = Search;
-    head->SaveFile = SaveFile;
-    head->ReadFile = ReadFile;
+    head->savefile = savefile;
+    head->readfile = readfile;
     head->get_number = get_number;
-    head->ReadFile(head);
+    head->readfile(head);
 }
 
 void Insert(LinkList head, const char* num, const char* name, const char* class, const char* phone, const char* addr, int number)//将信息插入链表
@@ -277,7 +298,7 @@ int Length(LinkList head)//获取链表的长度
     return length;
 }
 
-void SaveFile(LinkList head)//文件保存
+void savefile(LinkList head)//文件保存
 {
     FILE* fp = fopen("StuManage", "w");
     if (fp == NULL)
@@ -291,7 +312,7 @@ void SaveFile(LinkList head)//文件保存
     fclose(fp);
 }
 
-void ReadFile(struct ListNode* head)//文件读取
+void readfile(struct ListNode* head)//文件读取
 {
     FILE* fp = fopen("StuManage", "r");
     if (fp == NULL)
@@ -313,8 +334,8 @@ int get_number(struct ListNode p)//获取链表对象的number值
 
 void InitMenu(struct Menu* fu)//初始化菜单对象
 {
-    fu->mu[NUM].x = fu->mu[NAME].x = fu->mu[CLASS].x = fu->mu[PHONE].x = fu->mu[ADDR].x = fu->mu[MODIFY].x = fu->mu[DELETE].x = 3;
-    fu->mu[NUM].y = 5, fu->mu[NAME].y = 20, fu->mu[CLASS].y = 35, fu->mu[PHONE].y = 50, fu->mu[ADDR].y = 65, fu->mu[MODIFY].y = 80, fu->mu[DELETE].y = 95;
+    fu->mu[NUM].x = fu->mu[NAME].x = fu->mu[CLASS].x = fu->mu[PHONE].x = fu->mu[ADDR].x = fu->mu[MODIFY].x = fu->mu[DEL].x = 3;
+    fu->mu[NUM].y = 5, fu->mu[NAME].y = 20, fu->mu[CLASS].y = 35, fu->mu[PHONE].y = 50, fu->mu[ADDR].y = 65, fu->mu[MODIFY].y = 80, fu->mu[DEL].y = 95;
     fu->mu[SORT].x = 2, fu->mu[SORT].y = 2;
     fu->mu[SEARCH].x = 2, fu->mu[SEARCH].y = 84;
     fu->mu[QUIT].x = HIGH - 1, fu->mu[QUIT].y = 2;
@@ -567,9 +588,9 @@ void ShowMenu(struct Menu* fu, struct ListNode head, char* target)//显示菜单
                     else
                         printf("□");
                 }
-                else if (j == fu->mu[DELETE].y)
+                else if (j == fu->mu[DEL].y)
                 {
-                    if (fu->mu[USER].x == fu->mu[DELETE].x + p->get_number(*p) - (page - 1) * 20 && fu->mu[USER].y == fu->mu[DELETE].y)
+                    if (fu->mu[USER].x == fu->mu[DEL].x + p->get_number(*p) - (page - 1) * 20 && fu->mu[USER].y == fu->mu[DEL].y)
                         printf("●");
                     else
                         printf("□");
@@ -589,12 +610,12 @@ void Operate(struct Menu* fu, LinkList head)//主操作函数
     fu->get_add(fu, *head);
     fu->get_user(fu, *head);
     int n = Start();
-    system("cls");
+    gotoxy(0, 0);
     while (n)
     {
         ShowMenu(fu, *head, "\0");
         n = fu->Input(fu, head);
-        system("cls");
+        gotoxy(0, 0);
     }
 }
 
@@ -698,7 +719,7 @@ int Input(struct Menu* fu, struct ListNode* head)//接受按键字符进行相�
             }
             break;
         case 'a'://左移
-            if (((page < pagesum && fu->mu[USER].x > fu->mu[DELETE].x && fu->mu[USER].x <= fu->mu[DELETE].x + 20) || (page == pagesum && fu->mu[USER].x > fu->mu[DELETE].x && fu->mu[USER].x < fu->mu[DELETE].x + fu->mu[ADD].x)) && fu->mu[USER].y == fu->mu[DELETE].y)
+            if (((page < pagesum && fu->mu[USER].x > fu->mu[DEL].x && fu->mu[USER].x <= fu->mu[DEL].x + 20) || (page == pagesum && fu->mu[USER].x > fu->mu[DEL].x && fu->mu[USER].x < fu->mu[DEL].x + fu->mu[ADD].x)) && fu->mu[USER].y == fu->mu[DEL].y)
                 fu->mu[USER].y = fu->mu[MODIFY].y;
             else if (fu->mu[USER].x == fu->mu[RTURN].x && fu->mu[USER].y == fu->mu[RTURN].y)
             {
@@ -715,7 +736,7 @@ int Input(struct Menu* fu, struct ListNode* head)//接受按键字符进行相�
             break;
         case 'd'://右移
             if (((page < pagesum && fu->mu[USER].x > fu->mu[MODIFY].x && fu->mu[USER].x <= fu->mu[MODIFY].x + 20) || (page == pagesum && fu->mu[USER].x > fu->mu[MODIFY].x && fu->mu[USER].x < fu->mu[MODIFY].x + fu->mu[ADD].x)) && fu->mu[USER].y == fu->mu[MODIFY].y)
-                fu->mu[USER].y = fu->mu[DELETE].y;
+                fu->mu[USER].y = fu->mu[DEL].y;
             else if (fu->mu[USER].x == fu->mu[LTURN].x && fu->mu[USER].y == fu->mu[LTURN].y)
             {
                 fu->mu[USER].x = fu->mu[RTURN].x;
@@ -739,9 +760,9 @@ int Input(struct Menu* fu, struct ListNode* head)//接受按键字符进行相�
                 fu->Lturn(fu, *head);
             else if (fu->mu[USER].x == fu->mu[RTURN].x && fu->mu[USER].y == fu->mu[RTURN].y)//点击右翻页
                 fu->Rturn(fu, *head);
-            else if (fu->mu[USER].y == fu->mu[DELETE].y)//点击删除
+            else if (fu->mu[USER].y == fu->mu[DEL].y)//点击删除
             {
-                int number = (page - 1) * 20 + fu->mu[USER].x - fu->mu[DELETE].x;//获取信息在链表中对应的number值
+                int number = (page - 1) * 20 + fu->mu[USER].x - fu->mu[DEL].x;//获取信息在链表中对应的number值
                 fu->MenuDelete(fu, head, number);
             }
             else if (fu->mu[USER].x == fu->mu[SORT].x && fu->mu[USER].y == fu->mu[SORT].y)//点击排序
@@ -749,7 +770,7 @@ int Input(struct Menu* fu, struct ListNode* head)//接受按键字符进行相�
                 struct ListNode* low = head->next;
                 struct ListNode* high = head->Search(head, length);
                 head->Sort(head, low, high);
-                head->SaveFile(head);//在文件中存储新增数据
+                head->savefile(head);//在文件中存储新增数据
             }
             else if (fu->mu[USER].y == fu->mu[MODIFY].y)//点击修改键
             {
@@ -762,7 +783,7 @@ int Input(struct Menu* fu, struct ListNode* head)//接受按键字符进行相�
             }
             else if (fu->mu[USER].x == fu->mu[QUIT].x && fu->mu[USER].y == fu->mu[QUIT].y)//点击退出键
             {
-                return fu->Quit(fu);
+                return fu->Quit(fu, head);
             }
             break;
     }
@@ -778,6 +799,17 @@ void ShowAdd(LinkList head, const char* target, int x)//显示添加信息与修
     static char class[30];
     static char phone[15];
     static char addr[30];
+
+    if (x == 16)//通过传输的x进行判断是否清空静态数组中的信息
+    {
+        memset(num, 0, sizeof(char) * 15);
+        memset(name, 0, sizeof(char) * 20);
+        memset(class, 0, sizeof(char) * 30);
+        memset(phone, 0, sizeof(char) * 15);
+        memset(addr, 0, sizeof(char) * 30);
+        return;
+    }
+
     for ( i = 1; i <= HIGH; i++)
     {
         for ( j = 1; j <= WIDTH; j++)
@@ -877,14 +909,6 @@ void ShowAdd(LinkList head, const char* target, int x)//显示添加信息与修
         }
         printf("\n");
     }
-    if (x == 16)//通过传输的x进行判断是否清空静态数组中的信息
-    {
-        memset(num, 0, sizeof(char) * 15);
-        memset(name, 0, sizeof(char) * 20);
-        memset(class, 0, sizeof(char) * 30);
-        memset(phone, 0, sizeof(char) * 15);
-        memset(addr, 0, sizeof(char) * 30);
-    }
 }
 
 bool input_string(struct Menu* fu, LinkList head, char* target, int x, MenuData f)//实现实时输入
@@ -895,7 +919,7 @@ bool input_string(struct Menu* fu, LinkList head, char* target, int x, MenuData 
     int bufferindex = strlen(target) - 1;//记录下标位置
     do
     {
-        system("cls");
+        gotoxy(0, 0);
         if (f == ADD)
             ShowAdd(head, buffer, x);
         else
@@ -903,10 +927,13 @@ bool input_string(struct Menu* fu, LinkList head, char* target, int x, MenuData 
         input = _getch();
         if (input == 27)//esc键退出
         {
+            Sleep(30);
+            gotoxy(0, 0);
             if (f == ADD)
             {
                 ShowAdd(head, "\0", 16);//退出时将已输入的信息删除
-                system("cls");
+                Sleep(30);
+                gotoxy(0, 0);
             }
             return false;
         }
@@ -968,12 +995,14 @@ bool input_string(struct Menu* fu, LinkList head, char* target, int x, MenuData 
         }
     } while (input != '\r');//以按回车键为判断条件
     buffer[bufferindex] = '\0';
+    Sleep(100);
+    gotoxy(0, 0);
     if (f == ADD)
         ShowAdd(head, buffer, x);
     else
     {
         ShowMenu(fu, *head, buffer);
-        system("cls");
+        gotoxy(0, 0);
     }
     strncpy(target, buffer, bufferindex);//将最终的缓存数组赋值给目标数组
     return true;
@@ -999,9 +1028,9 @@ void Add(struct Menu* fu, LinkList head)//实现增添操作
     if (!input_string(fu, head, addr, 15, ADD))
         return;
     ShowAdd(head, "\0", 16);//清除函数中的静态数组残存的输入信息
-    system("cls");
+    gotoxy(0, 0);
     head->Insert(head, num, name, class, phone, addr, 0);
-    head->SaveFile(head);//在文件中存储新增数据
+    head->savefile(head);//在文件中存储新增数据
     pagesum = head->Length(head) / 20 + 1;
     if (page < pagesum)//当添加数据改页数据达到上限
         fu->Rturn(fu, *head);
@@ -1026,7 +1055,7 @@ void MenuDelete(struct Menu* fu, LinkList head, int number)//实现删除操作
     }
     else if (number == len)//删除最后一个数据
         fu->mu[USER].x--;
-    head->SaveFile(head);//在文件中存储新增数据
+    head->savefile(head);//在文件中存储新增数据
 }
 
 void Modify(struct Menu* fu, LinkList head, int number)//实现修改功能
@@ -1092,9 +1121,10 @@ void Modify(struct Menu* fu, LinkList head, int number)//实现修改功能
     phone[strlen(phone) - 1] = '\0';
     addr[strlen(addr) - 1] = '\0';
     ShowAdd(head, "\0", 16);
-    system("cls");
+    Sleep(100);
+    gotoxy(0, 0);
     head->Insert(head, num, name, class, phone, addr, number);//修改完成后再插入原有位置
-    head->SaveFile(head);//在文件中存储新增数据
+    head->savefile(head);//在文件中存储新增数据
 }
 
 void Lturn(struct Menu* fu, struct ListNode head)//实现左翻页
@@ -1141,14 +1171,22 @@ void MenuSearch(struct Menu* fu, struct ListNode head)//实现搜索功能
     else//若存在则改变当前页数
     {
         int pagesum = head.Length(&head) / 20 + 1;
-        page = number / 20 + 1;
-        fu->mu[USER].x = fu->mu[MODIFY].x + number % 20;
+        page = (number - 1) / 20 + 1;
+        if (number % 20 == 0)
+            fu->mu[USER].x = fu->mu[MODIFY].x + 20;
+        else
+            fu->mu[USER].x = fu->mu[MODIFY].x + number % 20;
         fu->mu[USER].y = fu->mu[MODIFY].y;
         fu->get_add(fu, head);
     }
 }
 
-int Quit(struct Menu* fu)
+int Quit(struct Menu* fu,LinkList head)
 {
+    int len = head->Length(head);
+    for (int i = 0; i < len; i++)
+    {
+        head->Delete(head, len - i);
+    }
     return 0;
 }
