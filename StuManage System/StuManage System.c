@@ -300,7 +300,7 @@ int Length(LinkList head)//获取链表的长度
 
 void savefile(LinkList head)//文件保存
 {
-    FILE* fp = fopen("StuManage", "w");
+    FILE* fp = fopen("StuManage.txt", "w");
     if (fp == NULL)
         return;
     LinkList p = head->next;
@@ -314,7 +314,7 @@ void savefile(LinkList head)//文件保存
 
 void readfile(struct ListNode* head)//文件读取
 {
-    FILE* fp = fopen("StuManage", "r");
+    FILE* fp = fopen("StuManage.txt", "r");
     if (fp == NULL)
         return;
     char num[15];
